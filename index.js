@@ -1,22 +1,20 @@
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcrypt");
-require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(express());
 app.use(
-    cors({
-      origin: [
-        "http://localhost:5173"
-      ],
-      credentials: true,
-    })
-  );
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -25,10 +23,10 @@ app.get("/", (req, res) => {
 });
 
 const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production" ,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-  };
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
 
 const username = process.env.DB_USERNAME;
 const password = process.env.DB_PASSWORD;
@@ -60,30 +58,15 @@ const verifyTOken = (req, res, next) => {
 
 async function run() {
   try {
-
     await client.connect();
-    app.post("/jwt", async (req, res) => {
-      const user = req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
-        expiresIn: "1h",
-      });
-      res.cookie("token", token, cookieOptions).send({ success: true });
-    });
-
-    //clearing Token
-    app.post("/logout", async (req, res) => {
-      const user = req.body;
-      res
-        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
-        .send({ success: true });
-    });
 
     const db = client.db("blogs");
     const usersCollection = db.collection("users");
+    const blogsCollection = db.collection("blogs");
 
     // register
     app.post("/signUp", async (req, res) => {
-      const { email, password ,name } = req.body;
+      const { email, password, name } = req.body;
 
       const userExists = await usersCollection.findOne({ email });
       if (userExists) {
@@ -93,7 +76,7 @@ async function run() {
       // Hash the password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const newUser = { email, password: hashedPassword,name };
+      const newUser = { email, password: hashedPassword, name };
       await usersCollection.insertOne(newUser);
 
       res.send({ success: true, message: "User registered successfully" });
@@ -119,20 +102,49 @@ async function run() {
         expiresIn: "1h",
       });
 
-      // Set the JWT as a cookie
-      res
-        .cookie("token", token, cookieOptions)
-        .send({ success: true, message: "Logged in successfully" ,user});
+      res.send({
+        success: true,
+        message: "Logged in successfully",
+        user,
+        token,
+      });
     });
 
-    // Logout - Clear the JWT token
-    app.post("/logout", async (req, res) => {
-      res
-        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
-        .send({ success: true, message: "Logged out successfully" });
+    // all blogs
+    app.get("/blogs", async (req, res) => {
+      const blogs = await blogsCollection.find().toArray();
+      res.send(blogs);
     });
 
-    
+    app.post("/addblogs", async (req, res) => {
+      const blogs = req.body;
+      console.log(blogs);
+      const result = await blogsCollection.insertOne(blogs);
+      res.send(result);
+    });
+
+    app.delete("/delete/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await blogsCollection.deleteOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
+    app.put("/blogsUpdate/:id", async (req, res) => {
+      const { id } = req.params;
+      const updatedBlog = req.body;
+      console.log(id)
+      const result = await blogsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            name: updatedBlog.name,
+            category: updatedBlog.category,
+            description: updatedBlog.description,
+          },
+        }
+      );
+      res.send(result);
+    });
+
     await client.db("admin").command({ ping: 1 });
     // console.log(
     //   "Pinged your deployment. You successfully connected to MongoDB!"
@@ -146,4 +158,3 @@ run().catch(console.dir);
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-
