@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 5000;
 app.use(express());
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://blogs-task-client.vercel.app"],
+    origin: ["http://localhost:5173", "https://blogs-task-client.vercel.app", "https://blog-task-server.vercel.app"],
     credentials: true,
   })
 );
